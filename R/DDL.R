@@ -4,17 +4,16 @@
 #'
 #' @param X the covariates matrix, of dimension \eqn{n\times p}
 #' @param Y the outcome vector, of length \eqn{n}
-#' @param idx the index for the regression coefficient of interest
-#' @param alpha the significance level of the confidence interval, default is 0.05
+#' @param index the vector of indexes for the regression coefficient of interest
 #' @param rho the trim level for \eqn{X}, default is 0.5
 #' @param rhop the trim level for \eqn{X_{-j}}, default is 0.5
 #' @return
-#' \item{point}{The Doubly Debiased Lasso estimator of the target regression coefficient}
-#' \item{se}{The standard error of the Doubly Debiased Lasso estimator}
-#' \item{CI}{The confidence interval for the target regression coefficient}
-#' \item{beta0}{The spectral deconfounding estimator of the whole regression vector}
+#' \item{index}{the vector of indexes for the regression coefficient of interest}
+#' \item{est_ddl}{The vector of the Doubly Debiased Lasso estimator of the target regression coefficient}
+#' \item{se}{The vector of the standard error of the Doubly Debiased Lasso estimator}
+#' \item{est_init}{The vector of the spectral deconfounding estimator of the whole regression vector}
 #' @examples
-#' idx = 1
+#' index = c(1,2,10)
 #' n=100
 #' p=200
 #' s=5
@@ -42,53 +41,62 @@
 #' #eq. (1), the response of the Structural Equation Model
 #' Y = X %*% beta + H %*% delta + nu
 #'
-#' result = DDL(X, Y, idx)
+#' result = DDL(X, Y, index)
+#' summary(result)
 #' @export
 #' @import stats
-DDL = function(X,Y,idx,alpha=0.05,rho=0.5,rhop=0.5){
+DDL = function(X,Y,index,rho=0.5,rhop=0.5){
   #determines parameters
   n = dim(X)[1]
   p = dim(X)[2]
-
-  X_negj=X[,-idx]
-
-  #single value decomposition of X (Trim transform)
-  UDV_list = svd(X_negj)
-  U = UDV_list$u
-  D = UDV_list$d
-  V = t(UDV_list$v)
-
-  #Reduce D, then make P trim
-  Dtilde = pmin(D, quantile(D,rhop))
-  P = diag(nrow(X_negj)) - U %*% diag(1 - Dtilde / D) %*% t(U)
-  P_X = P %*% X
-
-  #determine projection direction then estimate betahat and bhat(the z here has been multiplied with P)
-  z = find_z(P_X, idx)
+  dblasso = rep(NA,length(index))
+  stddev = rep(NA,length(index))
+  lower = rep(NA,length(index))
+  upper = rep(NA,length(index))
   est = estimate_coefficients(X,Y,rho)
   betahat = est$betahat
-  bhat = est$bhat
+  for (i in seq(length(index))){
+    X_negj=X[,-index[i]]
 
-  # eq. (12) for a point estimation of Bj(Step 6)
-  dblasso=t(z) %*% P%*%(Y - X_negj %*% betahat[-idx])/(t(z)%*%P%*%X[,idx])
+    #single value decomposition of X (Trim transform)
+    UDV_list = svd(X_negj)
+    U = UDV_list$u
+    D = UDV_list$d
+    V = t(UDV_list$v)
 
-  #eq. (23) for
-  Variance=(t(z)%*%(P^2)%*%z)/(t(z)%*%P%*%X[,idx])^2
+    #Reduce D, then make P trim
+    Dtilde = pmin(D, quantile(D,rhop))
+    P = diag(nrow(X_negj)) - U %*% diag(1 - Dtilde / D) %*% t(U)
+    P_X = P %*% X
 
-  #(Step 7)
-  sigmahat = estimate_sigma(X,Y,rho)
-  stddev = sigmahat*Variance^.5
+    #determine projection direction then estimate betahat and bhat(the z here has been multiplied with P)
+    z = find_z(P_X, index[i])
+    # bhat = est$bhat
 
-  #2-sided CI critical value for alpha
-  quantile = qnorm(1-alpha/2,mean=0,sd = 1,lower.tail=TRUE)
-  #determine bounds of interval, from eq. (13) (Step 8)
-  lower = dblasso - quantile * stddev
-  upper = dblasso + quantile * stddev
-  # B_b=t(z) %*% P_X %*% b/(t(z) %*% P_X[,idx]*stddev)
-  # B_beta= t(z) %*% P_X[,-idx] %*% (beta[-idx]-betahat[-idx])/(t(z) %*% P_X[,idx]*stddev)
+    # eq. (12) for a point estimation of Bj(Step 6)
+    dblasso[i] = t(z) %*% P %*% (Y - X_negj %*% betahat[-index[i]]) / (t(z) %*% P %*% X[,index[i]])
 
-  return_list = list("point"= dblasso,"se"=stddev, CI = c(lower,upper),"beta0" = betahat[idx])
-  return(return_list)
+    #eq. (23) for
+    Variance = (t(z) %*% (P^2) %*% z)/(t(z) %*% P %*% X[,index[i]]) ^ 2
+
+    #(Step 7)
+    sigmahat = estimate_sigma(X,Y,rho)
+    stddev[i] = sigmahat*Variance^.5
+
+    #2-sided CI critical value for alpha
+    # quantile = qnorm(1-alpha/2,mean=0,sd = 1,lower.tail=TRUE)
+    # #determine bounds of interval, from eq. (13) (Step 8)
+    # lower[i] = dblasso[i] - quantile * stddev[i]
+    # upper[i] = dblasso[i] + quantile * stddev[i]
+    # B_b=t(z) %*% P_X %*% b/(t(z) %*% P_X[,index]*stddev)
+    # B_beta= t(z) %*% P_X[,-index] %*% (beta[-index]-betahat[-index])/(t(z) %*% P_X[,index]*stddev)
+  }
+  obj = list(index = index,
+             est_init = betahat[index],
+             est_ddl= dblasso,
+             se = stddev)
+  class(obj) = "DDL"
+  obj
 }
 
 
