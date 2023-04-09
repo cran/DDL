@@ -1,7 +1,7 @@
 Package: DDL
 Type: Package
 Title: Doubly Debiased Lasso (DDL)
-Version: 1.0.1
+Version: 1.0.2
 Authors@R: c(
     person("Domagoj", "Ćevid", email = "cevid@stat.math.ethz.ch", role = c("aut")),
     person("Chengzhu", "Huang", email="czhuang0710@gmail.com", role = c("aut")),
@@ -13,11 +13,11 @@ Encoding: UTF-8
 Imports: stats, glmnet, Matrix
 RoxygenNote: 7.1.2
 NeedsCompilation: no
-Packaged: 2022-06-30 16:56:31 UTC; zhuyuqi
+Packaged: 2023-04-09 15:04:23 UTC; zhuyuqi
 Author: Domagoj Ćevid [aut],
   Chengzhu Huang [aut],
   Zijian Guo [aut, cre],
   Peter Bühlmann [aut]
 Maintainer: Zijian Guo <zijguo@stat.rutgers.edu>
 Repository: CRAN
-Date/Publication: 2022-06-30 17:30:05 UTC
+Date/Publication: 2023-04-09 15:20:01 UTC
